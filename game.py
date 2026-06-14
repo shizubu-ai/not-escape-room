@@ -60,8 +60,12 @@ class EscapeRoomGame:
         elif verb == "inventory":
             self.show_inventory()
         elif verb == "use" and len(parts) > 1:
-            target = " ".join(parts[2:]) if len(parts) > 2 else ""
-            self.use_item(parts[1], target)
+            remainder = command[4:].strip().lower()
+            if " on " in remainder:
+                item, target = remainder.split(" on ", 1)
+            else:
+                item, target = remainder, ""
+            self.use_item(item.strip(), target.strip())
         elif verb == "solve" and len(parts) > 2:
             self.solve(parts[1], " ".join(parts[2:]))
         elif verb == "hint":
@@ -151,11 +155,15 @@ class EscapeRoomGame:
             return
 
         if item == "note" and self.current_room == "archive":
-            self.logs.append("The terminal prompt highlights 3.14159265358...")
+            clue = self.puzzles["archive_lock"].answer
+            self.logs.append(f"The terminal prompt highlights {clue[:1]}.{clue[1:]}...")
             return
 
         if item == "strange coin" and self.current_room == "pattern":
-            self.logs.append("The symbols glow in a meaningful order: sun moon star eye")
+            self.logs.append(
+                "The symbols glow in a meaningful order: "
+                f"{self.puzzles['pattern_lock'].answer}"
+            )
             return
 
         self.logs.append(f"You use {item}{' on ' + target if target else ''}, but nothing happens.")

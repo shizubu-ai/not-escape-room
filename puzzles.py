@@ -20,13 +20,14 @@ class Puzzle:
 
 class PatternPuzzle(Puzzle):
     def __init__(self) -> None:
+        symbols = ["sun", "moon", "star", "eye", "key", "wave", "flame", "crown"]
         super().__init__(
             puzzle_id="pattern_lock",
             prompt="Arrange symbols in the correct sequence.",
-            answer="sun moon star eye",
-            brute_force_space=24_000_000,
+            answer=" ".join(symbols),
+            brute_force_space=40_320,
         )
-        self.symbols = ["sun", "moon", "star", "eye"]
+        self.symbols = symbols
 
     def shuffled_symbols(self) -> list[str]:
         pool = self.symbols[:]

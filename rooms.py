@@ -63,6 +63,6 @@ ITEM_DESCRIPTIONS = {
     "note": "A crumpled note: 'Digits of circles calm machines.'",
     "metal shard": "A sharp shard with tiny arrows etched in sequence.",
     "cipher page": "A page says: 'Long numbers are easier when constants are loved.'",
-    "strange coin": "A coin with symbols: SUN, MOON, STAR, EYE.",
+    "strange coin": "A coin with symbols: SUN, MOON, STAR, EYE, KEY, WAVE, FLAME, CROWN.",
     "master key": "A universal key stamped 'SERVICE OVERRIDE'.",
 }
