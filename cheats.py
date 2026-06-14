@@ -10,6 +10,7 @@ KONAMI_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right",
 
 
 def debug_enabled_from_env() -> bool:
+    """Enable debug mode when ESCAPE_ROOM_DEBUG is one of: 1, true, on, yes."""
     return os.getenv("ESCAPE_ROOM_DEBUG", "").strip().lower() in {"1", "true", "on", "yes"}
 
 
