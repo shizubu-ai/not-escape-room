@@ -110,11 +110,7 @@ class EscapeRoomGame:
             return
 
         if self.current_room == "vault" and direction == "east":
-            if not (
-                self.puzzles["archive_lock"].solved
-                and self.puzzles["pattern_lock"].solved
-                and self.puzzles["vault_lock"].solved
-            ):
+            if not self.all_main_puzzles_solved():
                 self.logs.append("The final door remains sealed. Additional authorization required.")
                 return
 
@@ -185,10 +181,17 @@ class EscapeRoomGame:
             self.logs.append(f"{puzzle_name} solved.")
             if puzzle_name == "archive_lock":
                 self.logs.append("A side panel opens; the hall's southern door is now responding.")
-            if self.puzzles["archive_lock"].solved and self.puzzles["pattern_lock"].solved and self.puzzles["vault_lock"].solved:
+            if self.all_main_puzzles_solved():
                 self.logs.append("All authorization layers disabled. The eastern exit is open.")
         else:
             self.logs.append("Incorrect answer.")
+
+    def all_main_puzzles_solved(self) -> bool:
+        return (
+            self.puzzles["archive_lock"].solved
+            and self.puzzles["pattern_lock"].solved
+            and self.puzzles["vault_lock"].solved
+        )
 
     def hint(self) -> None:
         self.hints_used += 1
