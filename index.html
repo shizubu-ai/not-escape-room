@@ -24,7 +24,7 @@
 
         .container {
             width: 100%;
-            max-width: 800px;
+            max-width: 900px;
             background: #0a0a0a;
             border: 3px solid #00ff00;
             border-radius: 5px;
@@ -66,7 +66,8 @@
 
         .items-section,
         .inventory-section,
-        .exits-section {
+        .exits-section,
+        .puzzle-section {
             margin-bottom: 15px;
             padding: 10px;
             border-left: 2px solid #00ff00;
@@ -76,6 +77,111 @@
         .section-label {
             color: #00ffff;
             font-weight: bold;
+        }
+
+        .puzzle-section {
+            background: #1a1a1a;
+            border: 2px solid #ff6600;
+        }
+
+        .puzzle-section .section-label {
+            color: #ff6600;
+        }
+
+        .puzzle-container {
+            background: #1a1a1a;
+            border: 2px solid #ff6600;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .puzzle-type {
+            color: #ffff00;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .riddle-text {
+            background: #0a0a0a;
+            border: 1px solid #ff6600;
+            padding: 10px;
+            border-radius: 3px;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .cipher-text {
+            font-family: monospace;
+            font-size: 1.1em;
+            background: #0a0a0a;
+            border: 1px solid #ff6600;
+            padding: 10px;
+            border-radius: 3px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+
+        .puzzle-input {
+            display: flex;
+            gap: 5px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+
+        .puzzle-input input {
+            flex: 1;
+            min-width: 150px;
+            padding: 8px;
+            background: #000;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 3px;
+            font-family: 'MS Gothic', monospace;
+            font-size: 0.95em;
+        }
+
+        .puzzle-input input:focus {
+            outline: none;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+
+        .puzzle-input button {
+            padding: 8px 15px;
+            background: #ff6600;
+            color: #000;
+            border: 2px solid #ff6600;
+            border-radius: 3px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .puzzle-input button:hover {
+            background: #ff8800;
+            box-shadow: 0 0 10px rgba(255, 102, 0, 0.5);
+        }
+
+        .puzzle-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .puzzle-option {
+            background: #1a1a1a;
+            border: 2px solid #ff6600;
+            padding: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .puzzle-option:hover {
+            background: #2a2a2a;
+            box-shadow: 0 0 10px rgba(255, 102, 0, 0.3);
         }
 
         .controls {
@@ -198,6 +304,10 @@
             color: #00ffff;
         }
 
+        .error {
+            color: #ff3333;
+        }
+
         .end-screen {
             text-align: center;
             padding: 40px 20px;
@@ -213,6 +323,17 @@
         .restart-button {
             font-size: 1.2em;
             padding: 15px 40px;
+        }
+
+        .solved-badge {
+            display: inline-block;
+            background: #00ff00;
+            color: #000;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            margin-left: 5px;
+            font-weight: bold;
         }
 
         @media (max-width: 600px) {
@@ -241,6 +362,10 @@
             .empty-space {
                 width: 50px;
             }
+
+            .puzzle-options {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -252,6 +377,11 @@
             <div class="room-info">
                 <div class="room-name" id="roomName">入口</div>
                 <div class="room-description" id="roomDescription"></div>
+            </div>
+
+            <div class="puzzle-section" id="puzzleSection" style="display: none;">
+                <span class="section-label">【謎解き】<span class="solved-badge" id="solvedBadge" style="display: none;">✓ 解答済み</span></span>
+                <div class="puzzle-container" id="puzzleContainer"></div>
             </div>
 
             <div class="items-section" id="itemsSection" style="display: none;">
@@ -297,6 +427,47 @@
     </div>
 
     <script>
+        const puzzles = {
+            cipher_lock: {
+                type: 'cipher',
+                question: 'ROT13暗号で暗号化されたドアのロック。',
+                cipher: 'BCYRFFR_SBEYTRG_ZR',
+                answer: 'PLEASE_FORGET_ME',
+                hint: 'ROT13で13文字シフトします',
+                solved: false,
+            },
+            riddle_sphinx: {
+                type: 'riddle',
+                question: 'スフィンクスの謎：朝は4本足、昼間は2本足、夜は3本足。これは何？',
+                options: ['人間', '犬', '猫', 'ロボット'],
+                answer: '人間',
+                hint: '生まれたときは這って移動し、成長すると2本足で歩き、年を取ると杖を使う...',
+                solved: false,
+            },
+            math_puzzle: {
+                type: 'math',
+                question: '数学パズル：3 + 5 - 2 = ?',
+                answer: '6',
+                hint: '順番に計算してください',
+                solved: false,
+            },
+            symbol_order: {
+                type: 'sequence',
+                question: 'シンボルの順序：◆ ● ■ ▲ ? の次は何？',
+                options: ['★', '♦', '○', '◆'],
+                answer: '★',
+                hint: 'パターンを見つけましょう：辺の数が増え���いきます',
+                solved: false,
+            },
+            code_puzzle: {
+                type: 'code',
+                question: 'コード解読：ABCDEF = 123456 のとき、BEAD = ?',
+                answer: '2146',
+                hint: 'A=1, B=2, C=3... という対応を見てください',
+                solved: false,
+            }
+        };
+
         const game = {
             rooms: {
                 'entrance': {
@@ -307,42 +478,52 @@
                     east: 'storage',
                     west: null,
                     displayName: '入口',
+                    puzzle: 'cipher_lock',
+                    requiredPuzzles: [],
                 },
                 'puzzle_room': {
-                    description: 'パズルの部屋。壁に複雑な暗号が書かれている。',
+                    description: 'パズルの部屋。壁に複雑な暗号が書かれている。謎を解かないと先に進めない。',
                     items: ['puzzle_piece'],
                     north: null,
                     south: 'entrance',
                     east: 'library',
                     west: null,
                     displayName: 'パズルの部屋',
+                    puzzle: 'riddle_sphinx',
+                    requiredPuzzles: ['cipher_lock'],
                 },
                 'storage': {
-                    description: '物置。様々なアイテムが積み重ねられている。',
+                    description: '物置。様々なアイテムが積み重ねられている。数列パズルが壁に描かれている。',
                     items: ['hammer', 'rope'],
                     north: null,
                     south: null,
                     east: null,
                     west: 'entrance',
                     displayName: '物置',
+                    puzzle: 'math_puzzle',
+                    requiredPuzzles: [],
                 },
                 'library': {
-                    description: '図書館。本棚に囲まれている。',
+                    description: '図書館。本棚に囲まれている。シンボルが壁に刻まれている。',
                     items: ['book', 'secret_scroll'],
                     north: null,
                     south: null,
                     east: 'exit',
                     west: 'puzzle_room',
                     displayName: '図書館',
+                    puzzle: 'symbol_order',
+                    requiredPuzzles: ['riddle_sphinx'],
                 },
                 'exit': {
-                    description: '脱出口！ここから出ることができる。',
+                    description: '脱出口！ここから出ることができる。コードパネルがある。',
                     items: [],
                     north: null,
                     south: null,
                     east: null,
                     west: 'library',
                     displayName: '脱出口',
+                    puzzle: 'code_puzzle',
+                    requiredPuzzles: ['symbol_order'],
                 },
             },
 
@@ -356,12 +537,31 @@
                 this.inventory = [];
                 this.escaped = false;
                 this.updateDisplay();
+                this.displayMessage('<span class="info">ゲーム開始！各部屋のパズルを解いて脱出を目指そう。</span>');
             },
 
             updateDisplay() {
                 const room = this.rooms[this.currentRoom];
                 document.getElementById('roomName').textContent = room.displayName;
                 document.getElementById('roomDescription').textContent = room.description;
+
+                // パズル表示
+                const puzzleSection = document.getElementById('puzzleSection');
+                if (room.puzzle) {
+                    const puzzle = puzzles[room.puzzle];
+                    if (puzzle) {
+                        puzzleSection.style.display = 'block';
+                        const solvedBadge = document.getElementById('solvedBadge');
+                        if (puzzle.solved) {
+                            solvedBadge.style.display = 'inline-block';
+                        } else {
+                            solvedBadge.style.display = 'none';
+                        }
+                        this.renderPuzzle(room.puzzle);
+                    }
+                } else {
+                    puzzleSection.style.display = 'none';
+                }
 
                 // アイテム表示
                 const itemsSection = document.getElementById('itemsSection');
@@ -377,11 +577,156 @@
 
                 // 移動可能な方向
                 const exits = [];
-                if (room.north) exits.push('北(W)');
-                if (room.south) exits.push('南(S)');
-                if (room.east) exits.push('東(D)');
-                if (room.west) exits.push('西(A)');
+                if (room.north && this.canMove('north', room)) exits.push('北(W)');
+                if (room.south && this.canMove('south', room)) exits.push('南(S)');
+                if (room.east && this.canMove('east', room)) exits.push('東(D)');
+                if (room.west && this.canMove('west', room)) exits.push('西(A)');
                 document.getElementById('exits').textContent = exits.length > 0 ? exits.join('  ') : 'なし';
+            },
+
+            canMove(direction, room) {
+                // パズルが必須の場合、解答済みかチェック
+                if (room.requiredPuzzles && room.requiredPuzzles.length > 0) {
+                    return room.requiredPuzzles.every(puzzleId => puzzles[puzzleId].solved);
+                }
+                return true;
+            },
+
+            renderPuzzle(puzzleId) {
+                const puzzle = puzzles[puzzleId];
+                const container = document.getElementById('puzzleContainer');
+                container.innerHTML = '';
+
+                const typeDiv = document.createElement('div');
+                typeDiv.className = 'puzzle-type';
+
+                const inputGroup = document.createElement('div');
+                inputGroup.className = 'puzzle-input';
+
+                switch (puzzle.type) {
+                    case 'cipher':
+                        typeDiv.textContent = '【暗号解読】';
+                        const cipherDiv = document.createElement('div');
+                        cipherDiv.className = 'cipher-text';
+                        cipherDiv.textContent = puzzle.cipher;
+                        container.appendChild(typeDiv);
+                        container.appendChild(cipherDiv);
+                        
+                        const cipherInput = document.createElement('input');
+                        cipherInput.type = 'text';
+                        cipherInput.placeholder = '答えを入力...';
+                        cipherInput.id = `puzzle_${puzzleId}`;
+                        inputGroup.appendChild(cipherInput);
+                        break;
+
+                    case 'riddle':
+                        typeDiv.textContent = '【謎なぞなぞ】';
+                        const riddleText = document.createElement('div');
+                        riddleText.className = 'riddle-text';
+                        riddleText.textContent = puzzle.question;
+                        container.appendChild(typeDiv);
+                        container.appendChild(riddleText);
+
+                        const optionsDiv = document.createElement('div');
+                        optionsDiv.className = 'puzzle-options';
+                        puzzle.options.forEach(option => {
+                            const btn = document.createElement('button');
+                            btn.textContent = option;
+                            btn.className = 'puzzle-option';
+                            btn.addEventListener('click', () => this.checkAnswer(puzzleId, option));
+                            optionsDiv.appendChild(btn);
+                        });
+                        container.appendChild(optionsDiv);
+                        return;
+
+                    case 'math':
+                        typeDiv.textContent = '【計算問題】';
+                        const mathDiv = document.createElement('div');
+                        mathDiv.className = 'riddle-text';
+                        mathDiv.textContent = puzzle.question;
+                        container.appendChild(typeDiv);
+                        container.appendChild(mathDiv);
+
+                        const mathInput = document.createElement('input');
+                        mathInput.type = 'text';
+                        mathInput.placeholder = '答えを入力...';
+                        mathInput.id = `puzzle_${puzzleId}`;
+                        inputGroup.appendChild(mathInput);
+                        break;
+
+                    case 'sequence':
+                        typeDiv.textContent = '【シーケンス】';
+                        const seqText = document.createElement('div');
+                        seqText.className = 'riddle-text';
+                        seqText.textContent = puzzle.question;
+                        container.appendChild(typeDiv);
+                        container.appendChild(seqText);
+
+                        const seqOptionsDiv = document.createElement('div');
+                        seqOptionsDiv.className = 'puzzle-options';
+                        puzzle.options.forEach(option => {
+                            const btn = document.createElement('button');
+                            btn.textContent = option;
+                            btn.className = 'puzzle-option';
+                            btn.addEventListener('click', () => this.checkAnswer(puzzleId, option));
+                            seqOptionsDiv.appendChild(btn);
+                        });
+                        container.appendChild(seqOptionsDiv);
+                        return;
+
+                    case 'code':
+                        typeDiv.textContent = '【コード解読】';
+                        const codeDiv = document.createElement('div');
+                        codeDiv.className = 'riddle-text';
+                        codeDiv.textContent = puzzle.question;
+                        container.appendChild(typeDiv);
+                        container.appendChild(codeDiv);
+
+                        const codeInput = document.createElement('input');
+                        codeInput.type = 'text';
+                        codeInput.placeholder = '答えを入力...';
+                        codeInput.id = `puzzle_${puzzleId}`;
+                        inputGroup.appendChild(codeInput);
+                        break;
+                }
+
+                if (inputGroup.children.length > 0) {
+                    const submitBtn = document.createElement('button');
+                    submitBtn.textContent = '回答';
+                    submitBtn.addEventListener('click', () => {
+                        const input = document.getElementById(`puzzle_${puzzleId}`);
+                        if (input) {
+                            this.checkAnswer(puzzleId, input.value);
+                        }
+                    });
+
+                    const hintBtn = document.createElement('button');
+                    hintBtn.textContent = 'ヒント';
+                    hintBtn.style.background = '#00ffff';
+                    hintBtn.style.borderColor = '#00ffff';
+                    hintBtn.addEventListener('click', () => {
+                        this.displayMessage(`<span class="info">【ヒント】${puzzle.hint}</span>`);
+                    });
+
+                    inputGroup.appendChild(submitBtn);
+                    inputGroup.appendChild(hintBtn);
+                    container.appendChild(inputGroup);
+                }
+            },
+
+            checkAnswer(puzzleId, answer) {
+                const puzzle = puzzles[puzzleId];
+                const isCorrect = answer.toUpperCase() === puzzle.answer.toUpperCase();
+
+                if (isCorrect) {
+                    puzzle.solved = true;
+                    this.lastMessage = `<span class="success">正解！パズルを解きました！</span>`;
+                    this.updateDisplay();
+                } else {
+                    this.lastMessage = `<span class="error">不正解です。もう一度試してください。</span>`;
+                }
+
+                this.displayMessage(this.lastMessage);
             },
 
             move(direction) {
@@ -404,12 +749,22 @@
                 }
 
                 if (nextRoom) {
+                    const nextRoomData = this.rooms[nextRoom];
+                    if (!this.canMove(direction, room)) {
+                        this.lastMessage = '<span class="warning">パズルを解かないと先に進めません！</span>';
+                        this.displayMessage(this.lastMessage);
+                        return;
+                    }
+
                     this.currentRoom = nextRoom;
                     this.lastMessage = `${directionName}へ移動しました。`;
 
                     if (this.currentRoom === 'exit') {
-                        this.escaped = true;
-                        this.showEndScreen();
+                        // 脱出口に到達したが、パズルが残っているかチェック
+                        if (!nextRoomData.puzzle || puzzles[nextRoomData.puzzle].solved) {
+                            this.escaped = true;
+                            this.showEndScreen();
+                        }
                     } else {
                         this.updateDisplay();
                     }
@@ -434,14 +789,19 @@
             },
 
             showHint() {
-                const hints = {
-                    'entrance': '装置には何か入力できそうだ...',
-                    'puzzle_room': '暗号を解くには、複数のヒントが必要かもしれない...',
-                    'storage': 'ロープとハンマーがあると、何かできそう...',
-                    'library': 'この本の中に秘密があるかもしれない...',
-                    'exit': 'これが脱出口だ！',
-                };
-                this.lastMessage = `<span class="info">【ヒント】${hints[this.currentRoom] || 'ヒントはありません。'}</span>`;
+                const room = this.rooms[this.currentRoom];
+                if (room.puzzle && !puzzles[room.puzzle].solved) {
+                    this.lastMessage = `<span class="info">【ヒント】${puzzles[room.puzzle].hint}</span>`;
+                } else {
+                    const hints = {
+                        'entrance': 'ドアのロックを解く必要があります...',
+                        'puzzle_room': 'スフィンクスの謎に答えましょう！',
+                        'storage': '数式を計算してみてください。',
+                        'library': 'シンボルのパターンを見つけましょう。',
+                        'exit': 'コードを解読して脱出します！',
+                    };
+                    this.lastMessage = `<span class="info">【ヒント】${hints[this.currentRoom] || 'ヒントはありません。'}</span>`;
+                }
                 this.displayMessage(this.lastMessage);
             },
 
@@ -456,11 +816,15 @@
 
             showEndScreen() {
                 const gameScreen = document.querySelector('.game-screen');
+                const solvedPuzzles = Object.keys(puzzles).filter(id => puzzles[id].solved).length;
+                const totalPuzzles = Object.keys(puzzles).length;
+
                 gameScreen.innerHTML = `
                     <div class="end-screen">
                         <h2>🎉 脱出成功！ 🎉</h2>
                         <p>おめでとうございます！</p>
                         <p style="margin-top: 20px; font-size: 1.1em;">脱出ルームから無事に脱出できました。</p>
+                        <p style="margin-top: 15px; color: #00ffff;">解答したパズル: ${solvedPuzzles}/${totalPuzzles}</p>
                     </div>
                 `;
                 document.querySelector('.controls').style.display = 'none';
@@ -505,6 +869,12 @@
                 const btn = document.querySelector(`[data-key="${key}"]`);
                 if (btn) {
                     btn.classList.add('pressed');
+                }
+            } else if (e.key === 'Enter') {
+                // Enterキーで回答ボタンをクリック
+                const buttons = document.querySelectorAll('.puzzle-input button');
+                if (buttons.length > 0) {
+                    buttons[0].click();
                 }
             }
         });
