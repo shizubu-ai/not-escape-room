@@ -156,6 +156,7 @@ class EscapeRoomGame:
 
         if item == "note" and self.current_room == "archive":
             clue = self.puzzles["archive_lock"].answer
+            # Display the integer answer in a familiar pi-like form as a subtle hint.
             formatted = f"{clue[0]}.{clue[1:]}"
             self.logs.append(f"The terminal prompt highlights {formatted}...")
             return

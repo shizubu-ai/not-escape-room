@@ -40,7 +40,7 @@ def build_puzzles() -> dict[str, Puzzle]:
         "archive_lock": Puzzle(
             puzzle_id="archive_lock",
             prompt="Enter 12-digit terminal unlock code",
-            # 3.14159265358 (12 digits including leading 3).
+            # First 12 digits of pi, including the leading "3" before the decimal point.
             answer="314159265358",
             brute_force_space=10**12,
         ),
