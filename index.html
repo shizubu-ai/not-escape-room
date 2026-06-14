@@ -273,8 +273,10 @@
         <div class="info-section">
             <div class="info-label">【操作ガイド】</div>
             <div class="info-content" style="font-size: 11px;">
-                WASD: 移動<br>
-                マウス: 視点<br>
+                W/S: 前後移動<br>
+                A/D: 右左移動<br>
+                矢印キー: 視点操作<br>
+                マウス: 視点操作<br>
                 E: 相互作用<br>
                 H: ヒント<br>
                 ESC: 終了
@@ -303,7 +305,7 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.getElementById('gameContainer').appendChild(renderer.domElement);
 
         // ライティング
@@ -342,14 +344,16 @@
         document.addEventListener('mousedown', () => { mouseDown = true; });
         document.addEventListener('mouseup', () => { mouseDown = false; });
         document.addEventListener('mousemove', (e) => {
-            if (!mouseDown) return;
+            if (!mouseDown && document.pointerLockElement !== document.body) return;
             yaw -= e.movementX * mouseSpeed;
             pitch -= e.movementY * mouseSpeed;
             pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
         });
 
-        // ポインターロック（フルスクリーン）
-        document.addEventListener('click', () => {
+        // ポインターロック（フルスクリーン）- ダイアログが開いていない時のみ
+        document.addEventListener('click', (e) => {
+            if (document.getElementById('puzzleDialog').classList.contains('active')) return;
+            if (e.target.closest('.info-panel, .controls, .puzzle-dialog, .puzzle-overlay')) return;
             document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock;
             document.body.requestPointerLock();
         });
@@ -361,6 +365,7 @@
             if (e.key.toLowerCase() === 'e') handleInteract();
             if (e.key.toLowerCase() === 'h') game.showHint();
             if (e.key === 'Escape') document.exitPointerLock();
+            if (e.key.startsWith('Arrow')) e.preventDefault();
         });
         document.addEventListener('keyup', (e) => {
             keys[e.key.toLowerCase()] = false;
@@ -517,43 +522,358 @@
         scene.add(rooms.right);
         scene.add(rooms.back);
 
-        // パズルマーカー作成
-        const puzzleMarkers = {};
-        for (const [id, puzzle] of Object.entries(puzzles)) {
-            const marker = new THREE.Mesh(
-                new THREE.SphereGeometry(0.5, 16, 16),
-                new THREE.MeshStandardMaterial({ 
-                    color: 0xff6600, 
-                    emissive: 0xff6600,
-                    emissiveIntensity: 0.5
-                })
+        // ─── 3D パズルオブジェクト作成ヘルパー ───
+
+        // 暗号錠（コントロールパネル）
+        function createCipherLock(position) {
+            const g = new THREE.Group();
+            // パネル本体
+            g.add(Object.assign(new THREE.Mesh(
+                new THREE.BoxGeometry(0.8, 1.2, 0.3),
+                new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.8 })
+            ), { castShadow: true }));
+            // 画面
+            const screen = new THREE.Mesh(
+                new THREE.BoxGeometry(0.6, 0.4, 0.05),
+                new THREE.MeshStandardMaterial({ color: 0x00ff44, emissive: 0x00ff44, emissiveIntensity: 0.7 })
             );
-            marker.position.copy(puzzle.position);
-            marker.castShadow = true;
-            scene.add(marker);
-            puzzleMarkers[id] = marker;
+            screen.position.set(0, 0.2, 0.18);
+            g.add(screen);
+            // テンキー（3×3）
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    const btn = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.11, 0.11, 0.05),
+                        new THREE.MeshStandardMaterial({ color: 0x444455, metalness: 0.5 })
+                    );
+                    btn.position.set((c - 1) * 0.16, -0.18 + r * 0.15, 0.18);
+                    g.add(btn);
+                }
+            }
+            // 南京錠シンボル（円柱）
+            const shackle = new THREE.Mesh(
+                new THREE.TorusGeometry(0.09, 0.025, 8, 12),
+                new THREE.MeshStandardMaterial({ color: 0xffaa00, metalness: 0.9 })
+            );
+            shackle.position.set(0, 0.68, 0.05);
+            g.add(shackle);
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(0.18, 0.14, 0.06),
+                new THREE.MeshStandardMaterial({ color: 0xffaa00, metalness: 0.9 })
+            );
+            body.position.set(0, 0.57, 0.05);
+            g.add(body);
+            g.position.copy(position);
+            return g;
         }
 
-        // アイテム作成
-        const items = [];
-        const itemPositions = [
-            { pos: new THREE.Vector3(-8, 1, 5), name: '🔑鍵', id: 'key' },
-            { pos: new THREE.Vector3(-8, 1, -5), name: '📝メモ', id: 'note' },
-            { pos: new THREE.Vector3(8, 1, 5), name: '🧩パズル', id: 'puzzle' },
-            { pos: new THREE.Vector3(25, 1, 0), name: '🔨ハンマー', id: 'hammer' },
-            { pos: new THREE.Vector3(25, 1, 10), name: '🪢ロープ', id: 'rope' },
-        ];
-
-        for (const item of itemPositions) {
-            const mesh = new THREE.Mesh(
-                new THREE.BoxGeometry(0.3, 0.3, 0.3),
-                new THREE.MeshStandardMaterial({ color: 0xffff00 })
+        // スフィンクス像
+        function createSphinx(position) {
+            const g = new THREE.Group();
+            const stoneMat = new THREE.MeshStandardMaterial({ color: 0xc8a06a, roughness: 0.9 });
+            // 胴体（ライオンの体）
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.8, 2.2), stoneMat);
+            torso.position.set(0, 0.4, 0);
+            torso.castShadow = true;
+            g.add(torso);
+            // 首
+            const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 0.5, 8), stoneMat);
+            neck.position.set(0, 0.95, -0.7);
+            g.add(neck);
+            // 頭
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.6), stoneMat);
+            head.position.set(0, 1.4, -0.7);
+            head.castShadow = true;
+            g.add(head);
+            // ネメスヘッドドレス
+            const headdress = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.25, 0.45, 0.55, 8),
+                new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.7 })
             );
-            mesh.position.copy(item.pos);
-            mesh.castShadow = true;
-            mesh.userData = { name: item.name, id: item.id };
-            scene.add(mesh);
-            items.push(mesh);
+            headdress.position.set(0, 1.85, -0.7);
+            g.add(headdress);
+            // 前足（左右）
+            [-0.45, 0.45].forEach(x => {
+                const paw = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.28, 0.8), stoneMat);
+                paw.position.set(x, 0.14, -1.15);
+                g.add(paw);
+            });
+            // 台座
+            const base = new THREE.Mesh(
+                new THREE.BoxGeometry(1.8, 0.2, 2.6),
+                new THREE.MeshStandardMaterial({ color: 0xa08050, roughness: 1.0 })
+            );
+            base.position.set(0, 0, 0);
+            base.receiveShadow = true;
+            g.add(base);
+            g.position.copy(position);
+            return g;
+        }
+
+        // 黒板（数学パズル）
+        function createChalkboard(position) {
+            const g = new THREE.Group();
+            // 木枠
+            const frame = new THREE.Mesh(
+                new THREE.BoxGeometry(1.8, 1.4, 0.12),
+                new THREE.MeshStandardMaterial({ color: 0x6b3a2a, roughness: 0.9 })
+            );
+            frame.castShadow = true;
+            g.add(frame);
+            // 黒板面
+            const board = new THREE.Mesh(
+                new THREE.BoxGeometry(1.6, 1.2, 0.06),
+                new THREE.MeshStandardMaterial({ color: 0x1a3a1a, roughness: 1.0 })
+            );
+            board.position.z = 0.07;
+            g.add(board);
+            // チョーク受け
+            const tray = new THREE.Mesh(
+                new THREE.BoxGeometry(1.6, 0.08, 0.14),
+                new THREE.MeshStandardMaterial({ color: 0x4a2010, roughness: 0.8 })
+            );
+            tray.position.set(0, -0.64, 0.05);
+            g.add(tray);
+            // 白いチョーク棒
+            const chalk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.02, 0.02, 0.18, 6),
+                new THREE.MeshStandardMaterial({ color: 0xffffff })
+            );
+            chalk.rotation.z = Math.PI / 2;
+            chalk.position.set(-0.1, -0.64, 0.12);
+            g.add(chalk);
+            g.position.copy(position);
+            return g;
+        }
+
+        // シンボル表示パネル（シーケンスパズル）
+        function createSymbolPanel(position) {
+            const g = new THREE.Group();
+            // キャビネット
+            const cabinet = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, 1.6, 0.4),
+                new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.4, metalness: 0.4 })
+            );
+            cabinet.castShadow = true;
+            g.add(cabinet);
+            // 画面
+            const screen = new THREE.Mesh(
+                new THREE.BoxGeometry(1.0, 0.7, 0.04),
+                new THREE.MeshStandardMaterial({ color: 0x0033cc, emissive: 0x001188, emissiveIntensity: 0.7 })
+            );
+            screen.position.set(0, 0.25, 0.22);
+            g.add(screen);
+            // 4つのシンボルボタン（異なる色）
+            [0xffee00, 0xff2222, 0x22ff22, 0x2222ff].forEach((col, i) => {
+                const btn = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.1, 10, 10),
+                    new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.4 })
+                );
+                btn.position.set((i - 1.5) * 0.24, -0.42, 0.22);
+                g.add(btn);
+            });
+            // スピーカーグリル穴（装飾）
+            for (let r = 0; r < 3; r++) {
+                const grill = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.8, 0.04, 0.05),
+                    new THREE.MeshStandardMaterial({ color: 0x111120 })
+                );
+                grill.position.set(0, -0.62 + r * 0.08, 0.22);
+                g.add(grill);
+            }
+            g.position.copy(position);
+            return g;
+        }
+
+        // 金庫（コード解読）
+        function createSafe(position) {
+            const g = new THREE.Group();
+            const metalMat = new THREE.MeshStandardMaterial({ color: 0x282828, roughness: 0.2, metalness: 0.95 });
+            // 本体
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.9, 0.7), metalMat);
+            body.castShadow = true;
+            g.add(body);
+            // ドア（わずかに前面）
+            const door = new THREE.Mesh(
+                new THREE.BoxGeometry(1.3, 1.8, 0.08),
+                new THREE.MeshStandardMaterial({ color: 0x353535, roughness: 0.15, metalness: 0.98 })
+            );
+            door.position.z = 0.39;
+            g.add(door);
+            // ダイヤル（外周リング）
+            const dialRim = new THREE.Mesh(
+                new THREE.TorusGeometry(0.22, 0.04, 10, 24),
+                new THREE.MeshStandardMaterial({ color: 0xcc9900, metalness: 0.9, roughness: 0.1 })
+            );
+            dialRim.rotation.x = Math.PI / 2;
+            dialRim.position.set(0.15, -0.1, 0.44);
+            g.add(dialRim);
+            // ダイヤル中心
+            const dialCenter = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.1, 0.1, 0.08, 16),
+                new THREE.MeshStandardMaterial({ color: 0xddaa00, metalness: 0.95 })
+            );
+            dialCenter.rotation.x = Math.PI / 2;
+            dialCenter.position.set(0.15, -0.1, 0.44);
+            g.add(dialCenter);
+            // ハンドル
+            const handleBar = new THREE.Mesh(
+                new THREE.BoxGeometry(0.07, 0.44, 0.07),
+                new THREE.MeshStandardMaterial({ color: 0xaa7700, metalness: 0.8 })
+            );
+            handleBar.position.set(-0.32, 0, 0.44);
+            g.add(handleBar);
+            // ヒンジ（上下）
+            [-0.78, 0.78].forEach(y => {
+                const hinge = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.05, 0.05, 0.14, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.7 })
+                );
+                hinge.rotation.z = Math.PI / 2;
+                hinge.position.set(0.62, y, 0.39);
+                g.add(hinge);
+            });
+            g.position.copy(position);
+            return g;
+        }
+
+        // ─── パズルオブジェクトをシーンに配置 ───
+        const puzzleMarkers = {};
+        const puzzleBuilders = {
+            cipher_lock:   createCipherLock,
+            riddle_sphinx: createSphinx,
+            math_puzzle:   createChalkboard,
+            symbol_order:  createSymbolPanel,
+            code_puzzle:   createSafe
+        };
+        for (const [id, puzzle] of Object.entries(puzzles)) {
+            const obj = puzzleBuilders[id](puzzle.position);
+            scene.add(obj);
+            puzzleMarkers[id] = obj;
+            // 発光する小球をマーカーとして足元に追加（未クリア時）
+            const glow = new THREE.Mesh(
+                new THREE.SphereGeometry(0.18, 10, 10),
+                new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff6600, emissiveIntensity: 1.0 })
+            );
+            glow.position.copy(puzzle.position);
+            glow.position.y = 0.2;
+            glow.userData.puzzleGlow = id;
+            scene.add(glow);
+        }
+
+        // ─── 3D アイテムオブジェクト作成 ───
+
+        // 鍵
+        function createKey3D(pos, name, id) {
+            const g = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.95, roughness: 0.05 });
+            // 環（トーラス）
+            g.add(new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.025, 8, 20), mat));
+            // 軸
+            const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.3, 0.03), mat);
+            shaft.position.set(0, -0.25, 0);
+            g.add(shaft);
+            // 歯 (2本)
+            [{ y: -0.32, x: 0.06 }, { y: -0.4, x: 0.06 }].forEach(t => {
+                const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.03), mat);
+                tooth.position.set(t.x, t.y, 0);
+                g.add(tooth);
+            });
+            g.position.copy(pos);
+            g.userData = { name, id };
+            return g;
+        }
+
+        // メモ（紙）
+        function createNote3D(pos, name, id) {
+            const g = new THREE.Group();
+            const paper = new THREE.Mesh(
+                new THREE.BoxGeometry(0.28, 0.36, 0.01),
+                new THREE.MeshStandardMaterial({ color: 0xffffc8, roughness: 1.0 })
+            );
+            g.add(paper);
+            for (let i = 0; i < 4; i++) {
+                const line = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 0.012, 0.015),
+                    new THREE.MeshStandardMaterial({ color: 0x4444cc })
+                );
+                line.position.set(0, 0.1 - i * 0.07, 0);
+                g.add(line);
+            }
+            g.position.copy(pos);
+            g.userData = { name, id };
+            return g;
+        }
+
+        // パズルピース
+        function createPuzzlePiece3D(pos, name, id) {
+            const g = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ color: 0xff4444, roughness: 0.6 });
+            const base = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.07, 0.24), mat);
+            g.add(base);
+            // コネクタ突起
+            [[0.14, 0], [-0.14, 0], [0, 0.14], [0, -0.14]].forEach(([x, z]) => {
+                const nub = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), mat);
+                nub.position.set(x, 0, z);
+                g.add(nub);
+            });
+            g.position.copy(pos);
+            g.userData = { name, id };
+            return g;
+        }
+
+        // ハンマー
+        function createHammer3D(pos, name, id) {
+            const g = new THREE.Group();
+            const handleMat = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 });
+            const headMat   = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7, roughness: 0.3 });
+            const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.55, 8), handleMat);
+            g.add(handle);
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.1), headMat);
+            head.position.set(0, 0.32, 0);
+            g.add(head);
+            g.position.copy(pos);
+            g.userData = { name, id };
+            return g;
+        }
+
+        // ロープ（コイル）
+        function createRope3D(pos, name, id) {
+            const g = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ color: 0xd4a866, roughness: 1.0 });
+            // 複数のトーラスを重ねてコイル状に
+            for (let i = 0; i < 4; i++) {
+                const coil = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.03, 6, 16), mat);
+                coil.rotation.x = Math.PI / 2;
+                coil.position.set(0, i * 0.06 - 0.09, 0);
+                g.add(coil);
+            }
+            g.position.copy(pos);
+            g.userData = { name, id };
+            return g;
+        }
+
+        // ─── アイテムをシーンに配置 ───
+        const items = [];
+        const itemBuilders = [
+            { fn: createKey3D,       pos: new THREE.Vector3(-8, 1, 5),  name: '🔑 鍵',     id: 'key' },
+            { fn: createNote3D,      pos: new THREE.Vector3(-8, 1, -5), name: '📝 メモ',   id: 'note' },
+            { fn: createPuzzlePiece3D, pos: new THREE.Vector3(8, 1, 5), name: '🧩 パズル', id: 'puzzle' },
+            { fn: createHammer3D,    pos: new THREE.Vector3(25, 1, 0),  name: '🔨 ハンマー', id: 'hammer' },
+            { fn: createRope3D,      pos: new THREE.Vector3(25, 1, 10), name: '🪢 ロープ', id: 'rope' },
+        ];
+        for (const { fn, pos, name, id } of itemBuilders) {
+            const obj = fn(pos, name, id);
+            obj.castShadow = true;
+            obj.userData._baseY = pos.y;
+            scene.add(obj);
+            items.push(obj);
+        }
+
+        // パズルダイアログを閉じる
+        function closePuzzleDialog() {
+            document.getElementById('puzzleDialog').classList.remove('active');
+            document.getElementById('puzzleOverlay').classList.remove('active');
         }
 
         // パズルダイアログ表示
@@ -562,7 +882,10 @@
             const dialog = document.getElementById('puzzleDialog');
             const overlay = document.getElementById('puzzleOverlay');
 
-            let html = `<h2>${puzzle.question}</h2>`;
+            let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                <h2 style="margin:0;">${puzzle.question}</h2>
+                <button class="puzzle-btn" onclick="closePuzzleDialog()" style="width:34px;height:34px;padding:0;font-size:20px;line-height:1;flex-shrink:0;margin-left:10px;">×</button>
+            </div>`;
             
             if (puzzle.type === 'cipher') {
                 html += `<div class="puzzle-question">🔐 ${puzzle.cipherText}</div>`;
@@ -634,8 +957,15 @@
 
             if (keys['w']) moveZ -= speed;
             if (keys['s']) moveZ += speed;
-            if (keys['a']) moveX -= speed;
-            if (keys['d']) moveX += speed;
+            if (keys['a']) moveX += speed;  // A = 右移動
+            if (keys['d']) moveX -= speed;  // D = 左移動
+
+            // 矢印キーで視点移動
+            const viewSpeed = 0.03;
+            if (keys['arrowleft'])  yaw += viewSpeed;
+            if (keys['arrowright']) yaw -= viewSpeed;
+            if (keys['arrowup'])   pitch = Math.min(Math.PI / 2, pitch + viewSpeed);
+            if (keys['arrowdown']) pitch = Math.max(-Math.PI / 2, pitch - viewSpeed);
 
             // カメラ方向に合わせて移動
             const cos = Math.cos(yaw);
@@ -654,6 +984,13 @@
             const euler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
             const direction = new THREE.Vector3(0, 0, -1).applyEuler(euler);
             camera.lookAt(camera.position.clone().add(direction));
+
+            // 現在いる部屋を判定
+            let roomLabel = '入口';
+            if (Math.abs(player.position.x + 25) < 13 && Math.abs(player.position.z) < 13) roomLabel = '左の部屋';
+            else if (Math.abs(player.position.x - 25) < 13 && Math.abs(player.position.z) < 13) roomLabel = '右の部屋';
+            else if (Math.abs(player.position.x) < 13 && Math.abs(player.position.z - 40) < 13) roomLabel = '奥の部屋';
+            game.currentRoom = roomLabel;
 
             // UI更新
             document.getElementById('roomName').textContent = game.currentRoom;
@@ -675,6 +1012,22 @@
         function animate() {
             requestAnimationFrame(animate);
             updatePlayer();
+
+            // アイテムをふわふわ回転させる
+            const t = performance.now() * 0.001;
+            items.forEach((item, i) => {
+                item.rotation.y = t + i * 1.3;
+                item.position.y = item.userData._baseY
+                    + Math.sin(t * 1.5 + i) * 0.08;
+            });
+
+            // 解決済みパズルのグロービームを非表示にする
+            scene.traverse(obj => {
+                if (obj.userData.puzzleGlow) {
+                    obj.visible = !puzzles[obj.userData.puzzleGlow].solved;
+                }
+            });
+
             renderer.render(scene, camera);
         }
 
