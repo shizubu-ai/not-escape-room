@@ -156,7 +156,7 @@ class EscapeRoomGame:
 
         if item == "note" and self.current_room == "archive":
             clue = self.puzzles["archive_lock"].answer
-            formatted = f"{clue[0]}.{clue[1:]}" if len(clue) > 0 else "(blank)"
+            formatted = f"{clue[0]}.{clue[1:]}"
             self.logs.append(f"The terminal prompt highlights {formatted}...")
             return
 
