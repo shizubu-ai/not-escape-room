@@ -41,6 +41,6 @@ def process_hidden_command(game: "EscapeRoomGame", command: str) -> bool:
         if game.konami_buffer == KONAMI_SEQUENCE:
             game.win("Legacy cheat sequence accepted. You found the developer backdoor.")
             return True
-        return True
+        return False
 
     return False
