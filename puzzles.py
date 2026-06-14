@@ -40,6 +40,7 @@ def build_puzzles() -> dict[str, Puzzle]:
         "archive_lock": Puzzle(
             puzzle_id="archive_lock",
             prompt="Enter 12-digit terminal unlock code",
+            # First 12 digits of pi.
             answer="314159265358",
             brute_force_space=10**12,
         ),
@@ -47,6 +48,7 @@ def build_puzzles() -> dict[str, Puzzle]:
         "vault_lock": Puzzle(
             puzzle_id="vault_lock",
             prompt="Enter 10-digit vault authentication code",
+            # First 10 digits of Euler's number (e).
             answer="2718281828",
             brute_force_space=10**10,
         ),

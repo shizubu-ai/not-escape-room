@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from game import EscapeRoomGame
 
 KONAMI_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "b", "a"]
 
@@ -9,7 +13,7 @@ def debug_enabled_from_env() -> bool:
     return os.getenv("ESCAPE_ROOM_DEBUG", "").strip().lower() in {"1", "true", "on", "yes"}
 
 
-def process_hidden_command(game: "EscapeRoomGame", command: str) -> bool:  # noqa: F821
+def process_hidden_command(game: "EscapeRoomGame", command: str) -> bool:
     lowered = command.strip().lower()
 
     if lowered in {"xyzzy", "iddqd", "/escape-now"}:

@@ -156,7 +156,7 @@ class EscapeRoomGame:
 
         if item == "note" and self.current_room == "archive":
             clue = self.puzzles["archive_lock"].answer
-            self.logs.append(f"The terminal prompt highlights {clue[:1]}.{clue[1:]}...")
+            self.logs.append(f"The terminal prompt highlights {clue[0]}.{clue[1:]}...")
             return
 
         if item == "strange coin" and self.current_room == "pattern":
