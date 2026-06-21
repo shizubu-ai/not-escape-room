@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Not Escape Room 3D 🔓</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'MS Gothic', 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            width: 100%;
+            height: 100vh;
+        }
+
+        #canvas {
+            display: block;
+        }
+
+        .ui-container {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            color: #00ff00;
+            font-size: 14px;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .hud {
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #00ff00;
+            border-radius: 3px;
+            padding: 10px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        .info-panel {
+            position: fixed;
+            right: 10px;
+            top: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            border-radius: 3px;
+            padding: 15px;
+            width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            color: #00ff00;
+            font-size: 12px;
+            z-index: 100;
+        }
+
+        .info-section {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #00ff00;
+        }
+
+        .info-label {
+            color: #00ffff;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .info-content {
+            color: #00ff00;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            border-radius: 3px;
+            padding: 10px;
+            color: #00ff00;
+            font-size: 12px;
+            max-width: 400px;
+            z-index: 100;
+        }
+
+        .puzzle-dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 10, 10, 0.95);
+            border: 3px solid #ff6600;
+            border-radius: 5px;
+            padding: 30px;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 200;
+            box-shadow: 0 0 30px rgba(255, 102, 0, 0.5);
+            display: none;
+            pointer-events: all;
+        }
+
+        .puzzle-dialog.active {
+            display: block;
+        }
+
+        .puzzle-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 150;
+            display: none;
+            pointer-events: all;
+        }
+
+        .puzzle-overlay.active {
+            display: block;
+        }
+
+        .puzzle-dialog h2 {
+            color: #ff6600;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .puzzle-question {
+            color: #00ff00;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #1a1a1a;
+            border-left: 3px solid #ff6600;
+            border-radius: 3px;
+        }
+
+        .puzzle-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .puzzle-btn {
+            padding: 10px;
+            background: #1a1a1a;
+            color: #00ff00;
+            border: 2px solid #ff6600;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'MS Gothic', monospace;
+        }
+
+        .puzzle-btn:hover {
+            background: #ff6600;
+            color: #000;
+        }
+
+        .puzzle-input {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .puzzle-input input {
+            flex: 1;
+            padding: 8px;
+            background: #000;
+            color: #00ff00;
+            border: 2px solid #ff6600;
+            font-family: 'MS Gothic', monospace;
+        }
+
+        .message {
+            position: fixed;
+            bottom: 120px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            padding: 10px;
+            border-radius: 3px;
+            max-width: 400px;
+            color: #00ff00;
+            z-index: 100;
+            font-size: 12px;
+            animation: fadeInOut 3s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+            border: 2px solid #00ff00;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 101;
+            opacity: 0.5;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: #00ff00;
+        }
+
+        .crosshair::before {
+            width: 2px;
+            height: 10px;
+            left: 50%;
+            top: -15px;
+            transform: translateX(-50%);
+        }
+
+        .crosshair::after {
+            width: 10px;
+            height: 2px;
+            left: -15px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer"></div>
+
+    <div class="ui-container">
+        <div class="hud">
+            <div>🔓 Not Escape Room 3D</div>
+            <div id="roomStatus">入口</div>
+        </div>
+    </div>
+
+    <div class="info-panel">
+        <div class="info-section">
+            <div class="info-label">【現在地】</div>
+            <div class="info-content" id="roomName">入口</div>
+        </div>
+        <div class="info-section">
+            <div class="info-label">【インベントリ】</div>
+            <div class="info-content" id="inventory">なし</div>
+        </div>
+        <div class="info-section">
+            <div class="info-label">【パズル進捗】</div>
+            <div class="info-content" id="puzzleProgress">0/5</div>
+        </div>
+        <div class="info-section">
+            <div class="info-label">【操作ガイド】</div>
+            <div class="info-content" style="font-size: 11px;">
+                WASD: 移動<br>
+                マウス: 視点<br>
+                E: 相互作用<br>
+                H: ヒント<br>
+                ESC: 終了
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div>💡 Eキーで近くのオブジェクトと相互作用できます</div>
+        <div>❓ Hキーでヒントを表示</div>
+    </div>
+
+    <div class="crosshair"></div>
+
+    <div class="puzzle-overlay" id="puzzleOverlay"></div>
+    <div class="puzzle-dialog" id="puzzleDialog"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Three.js シーン設定
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a1a);
+        scene.fog = new THREE.Fog(0x1a1a1a, 100, 200);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+        document.getElementById('gameContainer').appendChild(renderer.domElement);
+
+        // ライティング
+        const ambientLight = new THREE.AmbientLight(0x00ff00, 0.4);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        directionalLight.position.set(50, 50, 50);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.far = 200;
+        directionalLight.shadow.camera.left = -100;
+        directionalLight.shadow.camera.right = 100;
+        directionalLight.shadow.camera.top = 100;
+        directionalLight.shadow.camera.bottom = -100;
+        scene.add(directionalLight);
+
+        // プレイヤーコントローラー
+        const player = {
+            position: new THREE.Vector3(0, 1.6, 0),
+            velocity: new THREE.Vector3(0, 0, 0),
+            direction: new THREE.Vector3(0, 0, -1),
+            canJump: false,
+            speed: 0.15,
+            sprintSpeed: 0.25
+        };
+
+        camera.position.copy(player.position);
+
+        // マウスコントローラー
+        let yaw = 0, pitch = 0;
+        let mouseDown = false;
+        const mouseSpeed = 0.002;
+
+        document.addEventListener('mousedown', () => { mouseDown = true; });
+        document.addEventListener('mouseup', () => { mouseDown = false; });
+        document.addEventListener('mousemove', (e) => {
+            if (!mouseDown) return;
+            yaw -= e.movementX * mouseSpeed;
+            pitch -= e.movementY * mouseSpeed;
+            pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+        });
+
+        // ポインターロック（フルスクリーン）
+        document.addEventListener('click', () => {
+            document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock;
+            document.body.requestPointerLock();
+        });
+
+        // キーボード入力
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key.toLowerCase() === 'e') handleInteract();
+            if (e.key.toLowerCase() === 'h') game.showHint();
+            if (e.key === 'Escape') document.exitPointerLock();
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // パズルデータ
+        const puzzles = {
+            cipher_lock: {
+                type: 'cipher',
+                question: 'ROT13暗号を解読してください',
+                cipherText: 'BCYRFFR_SBEYTRG_ZR',
+                answer: 'PLEASE_FORGET_ME',
+                hint: 'ROT13で13文字シフト',
+                solved: false,
+                position: new THREE.Vector3(-8, 1, 0)
+            },
+            riddle_sphinx: {
+                type: 'riddle',
+                question: 'スフィンクスの謎に答えなさい',
+                riddle: '朝は4本足、昼間は2本足、夜は3本足。これは何？',
+                options: ['人間', '犬', '猫', 'ロボット'],
+                answer: '人間',
+                hint: '生まれたときは這って移動し、成長すると2本足で歩き、年を取ると杖を使う...',
+                solved: false,
+                position: new THREE.Vector3(8, 1, 0)
+            },
+            math_puzzle: {
+                type: 'math',
+                question: '数学パズルを解いてください',
+                problem: '3 + 5 - 2 = ?',
+                answer: '6',
+                hint: '順番に計算してください',
+                solved: false,
+                position: new THREE.Vector3(-8, 1, 20)
+            },
+            symbol_order: {
+                type: 'sequence',
+                question: 'シーケンスの次の図形は何か答えなさい',
+                sequence: '◆ ● ■ ▲ ?',
+                options: ['★', '♦', '○', '◆'],
+                answer: '★',
+                hint: 'パターンを見つけましょう',
+                solved: false,
+                position: new THREE.Vector3(8, 1, 20)
+            },
+            code_puzzle: {
+                type: 'code',
+                question: 'コードを解読してください',
+                problem: 'A=1, B=2, C=3... のとき BEAD = ?',
+                answer: '2146',
+                hint: 'アルファベット順を数字に変換してください',
+                solved: false,
+                position: new THREE.Vector3(0, 1, 40)
+            }
+        };
+
+        // ゲーム状態
+        const game = {
+            currentRoom: 'entrance',
+            inventory: [],
+            messages: [],
+            escaped: false,
+
+            addMessage(msg) {
+                this.messages.push(msg);
+                const msgEl = document.createElement('div');
+                msgEl.className = 'message';
+                msgEl.textContent = msg;
+                document.body.appendChild(msgEl);
+                setTimeout(() => msgEl.remove(), 3000);
+            },
+
+            showHint() {
+                for (const [id, puzzle] of Object.entries(puzzles)) {
+                    if (!puzzle.solved && Math.hypot(
+                        player.position.x - puzzle.position.x,
+                        player.position.z - puzzle.position.z
+                    ) < 5) {
+                        this.addMessage(`💡 ${puzzle.hint}`);
+                        return;
+                    }
+                }
+            }
+        };
+
+        // ルーム作成関数
+        function createRoom(name, color, position, size) {
+            const group = new THREE.Group();
+            
+            // 床
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(size.x, size.z),
+                new THREE.MeshStandardMaterial({ color, roughness: 0.8 })
+            );
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            group.add(floor);
+
+            // 壁
+            const wallMaterial = new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
+            
+            // 北壁
+            const wallN = new THREE.Mesh(new THREE.BoxGeometry(size.x, 3, 0.2), wallMaterial);
+            wallN.position.z = -size.z / 2;
+            wallN.position.y = 1.5;
+            wallN.castShadow = true;
+            group.add(wallN);
+
+            // 南壁
+            const wallS = new THREE.Mesh(new THREE.BoxGeometry(size.x, 3, 0.2), wallMaterial);
+            wallS.position.z = size.z / 2;
+            wallS.position.y = 1.5;
+            wallS.castShadow = true;
+            group.add(wallS);
+
+            // 東壁
+            const wallE = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3, size.z), wallMaterial);
+            wallE.position.x = size.x / 2;
+            wallE.position.y = 1.5;
+            wallE.castShadow = true;
+            group.add(wallE);
+
+            // 西壁
+            const wallW = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3, size.z), wallMaterial);
+            wallW.position.x = -size.x / 2;
+            wallW.position.y = 1.5;
+            wallW.castShadow = true;
+            group.add(wallW);
+
+            // 天井
+            const ceiling = new THREE.Mesh(
+                new THREE.PlaneGeometry(size.x, size.z),
+                new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(0.5) })
+            );
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.y = 3;
+            ceiling.receiveShadow = true;
+            group.add(ceiling);
+
+            group.position.copy(position);
+            return group;
+        }
+
+        // ルーム作成
+        const rooms = {
+            entrance: createRoom('entrance', 0x004400, new THREE.Vector3(0, 0, 0), { x: 20, z: 20 }),
+            left: createRoom('left', 0x003300, new THREE.Vector3(-25, 0, 0), { x: 20, z: 20 }),
+            right: createRoom('right', 0x004400, new THREE.Vector3(25, 0, 0), { x: 20, z: 20 }),
+            back: createRoom('back', 0x333300, new THREE.Vector3(0, 0, 40), { x: 20, z: 20 })
+        };
+
+        scene.add(rooms.entrance);
+        scene.add(rooms.left);
+        scene.add(rooms.right);
+        scene.add(rooms.back);
+
+        // パズルマーカー作成
+        const puzzleMarkers = {};
+        for (const [id, puzzle] of Object.entries(puzzles)) {
+            const marker = new THREE.Mesh(
+                new THREE.SphereGeometry(0.5, 16, 16),
+                new THREE.MeshStandardMaterial({ 
+                    color: 0xff6600, 
+                    emissive: 0xff6600,
+                    emissiveIntensity: 0.5
+                })
+            );
+            marker.position.copy(puzzle.position);
+            marker.castShadow = true;
+            scene.add(marker);
+            puzzleMarkers[id] = marker;
+        }
+
+        // アイテム作成
+        const items = [];
+        const itemPositions = [
+            { pos: new THREE.Vector3(-8, 1, 5), name: '🔑鍵', id: 'key' },
+            { pos: new THREE.Vector3(-8, 1, -5), name: '📝メモ', id: 'note' },
+            { pos: new THREE.Vector3(8, 1, 5), name: '🧩パズル', id: 'puzzle' },
+            { pos: new THREE.Vector3(25, 1, 0), name: '🔨ハンマー', id: 'hammer' },
+            { pos: new THREE.Vector3(25, 1, 10), name: '🪢ロープ', id: 'rope' },
+        ];
+
+        for (const item of itemPositions) {
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3, 0.3, 0.3),
+                new THREE.MeshStandardMaterial({ color: 0xffff00 })
+            );
+            mesh.position.copy(item.pos);
+            mesh.castShadow = true;
+            mesh.userData = { name: item.name, id: item.id };
+            scene.add(mesh);
+            items.push(mesh);
+        }
+
+        // パズルダイアログ表示
+        function showPuzzleDialog(puzzleId) {
+            const puzzle = puzzles[puzzleId];
+            const dialog = document.getElementById('puzzleDialog');
+            const overlay = document.getElementById('puzzleOverlay');
+
+            let html = `<h2>${puzzle.question}</h2>`;
+            
+            if (puzzle.type === 'cipher') {
+                html += `<div class="puzzle-question">🔐 ${puzzle.cipherText}</div>`;
+                html += `<div class="puzzle-input"><input type="text" id="input" placeholder="答え" autofocus></div>`;
+            } else if (puzzle.type === 'riddle' || puzzle.type === 'sequence') {
+                html += `<div class="puzzle-question">${puzzle.riddle || puzzle.sequence}</div><div class="puzzle-options">`;
+                puzzle.options.forEach(opt => {
+                    html += `<button class="puzzle-btn" onclick="game.solvePuzzle('${puzzleId}', '${opt}')">${opt}</button>`;
+                });
+                html += `</div>`;
+            } else {
+                html += `<div class="puzzle-question">${puzzle.problem}</div>`;
+                html += `<div class="puzzle-input"><input type="text" id="input" placeholder="答え" autofocus></div>`;
+            }
+
+            html += `<button class="puzzle-btn" onclick="game.solvePuzzle('${puzzleId}')" style="width: 100%; margin-top: 10px;">送信</button>`;
+
+            dialog.innerHTML = html;
+            dialog.classList.add('active');
+            overlay.classList.add('active');
+
+            if (document.getElementById('input')) {
+                document.getElementById('input').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') game.solvePuzzle(puzzleId);
+                });
+            }
+        }
+
+        game.solvePuzzle = function(puzzleId, answer = null) {
+            const puzzle = puzzles[puzzleId];
+            const userAnswer = answer || document.getElementById('input').value;
+
+            if (userAnswer.toUpperCase() === puzzle.answer.toUpperCase()) {
+                puzzle.solved = true;
+                game.addMessage('✓ 正解！');
+                document.getElementById('puzzleDialog').classList.remove('active');
+                document.getElementById('puzzleOverlay').classList.remove('active');
+            } else {
+                game.addMessage('✗ 不正解...');
+            }
+        };
+
+        // 相互作用処理
+        function handleInteract() {
+            // パズル
+            for (const [id, puzzle] of Object.entries(puzzles)) {
+                if (!puzzle.solved && player.position.distanceTo(puzzle.position) < 2) {
+                    showPuzzleDialog(id);
+                    return;
+                }
+            }
+            
+            // アイテム
+            for (let i = items.length - 1; i >= 0; i--) {
+                if (player.position.distanceTo(items[i].position) < 1.5) {
+                    game.addMessage(`✓ ${items[i].userData.name} を取得`);
+                    game.inventory.push(items[i].userData.id);
+                    scene.remove(items[i]);
+                    items.splice(i, 1);
+                    return;
+                }
+            }
+        }
+
+        // プレイヤー移動更新
+        function updatePlayer() {
+            const speed = keys['shift'] ? player.sprintSpeed : player.speed;
+            let moveX = 0, moveZ = 0;
+
+            if (keys['w']) moveZ -= speed;
+            if (keys['s']) moveZ += speed;
+            if (keys['a']) moveX -= speed;
+            if (keys['d']) moveX += speed;
+
+            // カメラ方向に合わせて移動
+            const cos = Math.cos(yaw);
+            const sin = Math.sin(yaw);
+            player.position.x += moveX * cos - moveZ * sin;
+            player.position.z += moveX * sin + moveZ * cos;
+
+            // プレイヤーの位置制限
+            player.position.x = Math.max(-40, Math.min(40, player.position.x));
+            player.position.z = Math.max(-10, Math.min(50, player.position.z));
+
+            // カメラ更新
+            camera.position.copy(player.position);
+
+            // カメラ方向更新
+            const euler = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+            const direction = new THREE.Vector3(0, 0, -1).applyEuler(euler);
+            camera.lookAt(camera.position.clone().add(direction));
+
+            // UI更新
+            document.getElementById('roomName').textContent = game.currentRoom;
+            document.getElementById('inventory').textContent = game.inventory.length > 0 
+                ? game.inventory.join(', ')
+                : 'なし';
+
+            const solvedCount = Object.values(puzzles).filter(p => p.solved).length;
+            document.getElementById('puzzleProgress').textContent = `${solvedCount}/5`;
+
+            // 脱出チェック
+            if (player.position.z > 45 && solvedCount === 5 && !game.escaped) {
+                game.escaped = true;
+                game.addMessage('🎉 脱出成功！');
+            }
+        }
+
+        // ゲームループ
+        function animate() {
+            requestAnimationFrame(animate);
+            updatePlayer();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

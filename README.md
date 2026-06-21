@@ -24,8 +24,21 @@
 
 ## 実行方法
 
+### ブラウザで遊ぶ（推奨）
+
+**GitHub Pages で公開中:**
+👉 [Not Escape Room をプレイ](https://shizubu-ai.github.io/not-escape-room/)
+
+または、`index.html` をブラウザで開いてください：
 ```bash
-python main.py
+# リポジトリをクローン
+git clone https://github.com/shizubu-ai/not-escape-room.git
+cd not-escape-room
+
+# ブラウザで開く
+open index.html  # macOS
+start index.html # Windows
+xdg-open index.html # Linux
 ```
 
 ## 基本コマンド
